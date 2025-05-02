@@ -80,7 +80,7 @@ export function LeadForm() {
         }
       });
 
-      formData.append('origem', estabelecimentoValido ? estabelecimento : 'direto');
+      formData.append('origem', estabelecimentoValido ? estabelecimento : 'deafult');
       formData.append('data_cadastro', new Date().toISOString());
       formData.append('submissionId', submissionId);
       formData.append('timestamp', new Date().toISOString());
@@ -245,7 +245,7 @@ export function LeadForm() {
           <div className="space-y-1 md:space-y-2">
             <Label htmlFor="consumo" className="flex items-center text-sm md:text-base">
               <Zap className="w-4 h-4 mr-2 text-trenergia-blue" />
-              Consumo do Último Mês (kWh)
+              Valor da última fatura Neoenergia (R$)
             </Label>
             <Input
               id="consumo"
@@ -259,7 +259,7 @@ export function LeadForm() {
               <p className="text-xs md:text-sm text-red-500 animate-slide-up">{form.formState.errors.consumo.message}</p>
             )}
             <p className="text-xs text-gray-500">
-              Informe o consumo em kWh da sua última conta de energia.
+              Informe o valor em R$ da sua ultima.
             </p>
           </div>
         </div>
