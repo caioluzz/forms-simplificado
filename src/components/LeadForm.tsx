@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Mail, Phone, Shield } from 'lucide-react';
+import { User, Mail, Phone, Zap } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import FileUpload from './FileUpload';
 import FormHeader from './FormHeader';
 import SuccessMessage from './SuccessMessage';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -32,32 +32,16 @@ const formSchema = z.object({
     .min(10, { message: "Telefone deve ter pelo menos 10 dígitos (com DDD)" })
     .max(15, { message: "Número de telefone muito longo" })
     .regex(/^[0-9]+$/, { message: "Telefone deve conter apenas números" }),
-  cpf: z.string().optional(),
-  cnpj: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zipCode: z.string().optional(),
-  complement: z.string().optional(),
-  number: z.string().optional(),
-  neighborhood: z.string().optional(),
-  reference: z.string().optional(),
+  consumo: z.string()
+    .min(1, { message: "Por favor, informe o consumo" })
+    .regex(/^\d+$/, { message: "O consumo deve conter apenas números" })
 });
 
 interface FormValues {
   name: string;
   email: string;
   phone: string;
-  cpf: string;
-  cnpj: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  complement: string;
-  number: string;
-  neighborhood: string;
-  reference: string;
+  consumo: string;
 }
 
 export function LeadForm() {
@@ -67,7 +51,6 @@ export function LeadForm() {
   const { estabelecimento } = useParams();
   const estabelecimentoValido = estabelecimento && estabelecimentosValidos.includes(estabelecimento);
 
-  const [files, setFiles] = useState<File[] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -80,16 +63,7 @@ export function LeadForm() {
       name: '',
       email: '',
       phone: '',
-      cpf: '',
-      cnpj: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      complement: '',
-      number: '',
-      neighborhood: '',
-      reference: ''
+      consumo: ''
     }
   });
 
@@ -98,50 +72,30 @@ export function LeadForm() {
       setIsSubmitting(true);
       setError(null);
 
-      // Validação de arquivos
-      if (!files || files.length === 0) {
-        setError('Por favor, faça o upload dos arquivos necessários');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Criar FormData para enviar os arquivos
       const formData = new FormData();
 
-      // Adicionar os dados do formulário diretamente
       Object.entries(data).forEach(([key, value]) => {
         if (value) {
           formData.append(key, value);
         }
       });
 
-      // Adicionar a origem do lead
       formData.append('origem', estabelecimentoValido ? estabelecimento : 'direto');
       formData.append('data_cadastro', new Date().toISOString());
-
-      // Adicionar os arquivos ao FormData
-      files.forEach((file, index) => {
-        formData.append(`file_${index}`, file);
-      });
-
-      // Adicionar o ID da submissão
       formData.append('submissionId', submissionId);
       formData.append('timestamp', new Date().toISOString());
 
-      // Configurar o timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      // Obter a URL do webhook
       const webhookUrl = import.meta.env.VITE_WEBHOOK_URL;
-      console.log('Webhook URL:', webhookUrl); // Log para debug
+      console.log('Webhook URL:', webhookUrl);
 
       if (!webhookUrl) {
         console.error('URL do webhook não configurada');
         throw new Error('Configuração do webhook não encontrada. Por favor, verifique as variáveis de ambiente.');
       }
 
-      // Verificar se a URL é válida
       try {
         new URL(webhookUrl);
       } catch (e) {
@@ -170,34 +124,28 @@ export function LeadForm() {
           webhookUrl
         });
 
-        if (response.status === 413) {
-          throw new Error('O arquivo é muito grande. Por favor, envie um arquivo menor.');
-        } else if (response.status === 429) {
+        if (response.status === 429) {
           throw new Error('Muitas tentativas. Por favor, aguarde um momento e tente novamente.');
         } else {
           throw new Error(`Erro ao enviar formulário: ${response.statusText}`);
         }
       }
 
-      // Verificar o tipo de conteúdo da resposta
       const contentType = response.headers.get('content-type');
       let result;
 
       if (contentType && contentType.includes('application/json')) {
         result = await response.json();
       } else {
-        // Se não for JSON, pegar o texto da resposta
         result = await response.text();
       }
 
       console.log('Resposta do servidor:', result);
 
-      // Se a resposta for "Accepted" ou qualquer outro texto, consideramos sucesso
       if (response.ok) {
         toast.success('Formulário enviado com sucesso!');
         setIsSubmitted(true);
         form.reset();
-        setFiles(null);
         setIsSubmitting(false);
       } else {
         throw new Error('Erro ao processar resposta do servidor');
@@ -216,6 +164,11 @@ export function LeadForm() {
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    e.target.value = value;
+  };
+
+  const handleConsumoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '');
     e.target.value = value;
   };
@@ -289,40 +242,34 @@ export function LeadForm() {
             </p>
           </div>
 
-          <div className="space-y-1 md:space-y-2 pt-1 md:pt-2">
-            <Label htmlFor="file-upload" className="flex items-center">
-              <FileUpload
-                onChange={setFiles}
-                value={files}
-                description="Carregue um PDF ou uma foto legível da sua conta de energia mais recente."
-              />
+          <div className="space-y-1 md:space-y-2">
+            <Label htmlFor="consumo" className="flex items-center text-sm md:text-base">
+              <Zap className="w-4 h-4 mr-2 text-trenergia-blue" />
+              Consumo do Último Mês (kWh)
             </Label>
+            <Input
+              id="consumo"
+              type="text"
+              placeholder="Digite apenas números"
+              className="animated-input text-sm md:text-base h-9 md:h-10"
+              {...form.register("consumo")}
+              onChange={handleConsumoChange}
+            />
+            {form.formState.errors.consumo && (
+              <p className="text-xs md:text-sm text-red-500 animate-slide-up">{form.formState.errors.consumo.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
+              Informe o consumo em kWh da sua última conta de energia.
+            </p>
           </div>
-        </div>
-
-        <div className="bg-trenergia-gray/50 p-2 md:p-3 rounded-lg flex items-start space-x-2">
-          <Shield className="w-4 h-4 text-trenergia-blue mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-gray-600">
-            Suas informações serão tratadas com confidencialidade e utilizadas exclusivamente para a elaboração da proposta de economia na conta de energia.
-          </p>
         </div>
 
         <Button
           type="submit"
-          className={`w-full bg-trenergia-blue hover:bg-trenergia-blue/90 text-white font-medium ${isMobile ? 'py-4 text-sm' : 'py-6'}`}
+          className="w-full bg-trenergia-blue hover:bg-trenergia-lightblue text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
           disabled={isSubmitting}
         >
-          {isSubmitting ? (
-            <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Processando...
-            </span>
-          ) : (
-            "Receber Minha Proposta"
-          )}
+          {isSubmitting ? 'Enviando...' : 'Enviar Formulário'}
         </Button>
       </form>
     </div>
