@@ -19,7 +19,10 @@ const estabelecimentosValidos = [
   'mariadocarmoalves',
   'casagradedasubaias',
   'itaoca',
-  'instagram'
+  'instagram',
+  'mariamarta',
+  'jardimbeirario',
+  'arenaazure'
 ];
 
 const formSchema = z.object({
